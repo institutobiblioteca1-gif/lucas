@@ -191,11 +191,9 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
                       <button onClick={() => onReview(p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Revisar plano">
                         <Eye className="w-4 h-4" />
                       </button>
-                      {p.status === 'rascunho' && (
-                        <button onClick={() => openStatusModal(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Alterar status">
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button onClick={() => openStatusModal(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Alterar status">
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
