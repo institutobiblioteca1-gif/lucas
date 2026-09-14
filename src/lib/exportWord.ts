@@ -31,8 +31,8 @@ function sectionHeader(text: string): string {
   return `<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto"/><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
 }
 
-function tableCellWide(label: string, value: string, colSpan: number): string {
-  return `<w:tc><w:tcPr><w:tcW w:w="${2690}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="12478" w:type="dxa"/><w:gridSpan w:val="${colSpan}"/></w:tcPr><w:p><w:pPr><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p></w:tc>`;
+function tableRow(label: string, value: string): string {
+  return `<w:tr><w:tc><w:tcPr><w:tcW w:w="2808" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="6552" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p></w:tc></w:tr>`;
 }
 
 export function generateDocxXml(data: PlanData): string {
@@ -44,7 +44,7 @@ export function generateDocxXml(data: PlanData): string {
 
   const identificationTable = `<w:tbl>
 <w:tblPr>
-<w:tblW w:w="15168" w:type="dxa"/>
+<w:tblW w:w="9360" w:type="dxa"/>
 <w:tblBorders>
 <w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>
 <w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>
@@ -55,13 +55,13 @@ export function generateDocxXml(data: PlanData): string {
 </w:tblBorders>
 </w:tblPr>
 <w:tblGrid>
-<w:gridCol w:w="2690"/><w:gridCol w:w="2981"/><w:gridCol w:w="2128"/><w:gridCol w:w="2125"/><w:gridCol w:w="2551"/><w:gridCol w:w="2693"/>
+<w:gridCol w:w="2808"/><w:gridCol w:w="6552"/>
 </w:tblGrid>
-<w:tr>${tableCellWide('Curso:', course.name, 5)}</w:tr>
-<w:tr>${tableCellWide('Ano/Semestre:', anoSemestre, 5)}</w:tr>
-<w:tr>${tableCellWide('Código/Nome da disciplina:', codNome, 5)}</w:tr>
-<w:tr>${tableCellWide('CH/Créditos:', chCreditos, 5)}</w:tr>
-<w:tr>${tableCellWide('Professor Responsável:', profName, 5)}</w:tr>
+${tableRow('Curso:', course.name)}
+${tableRow('Ano/Semestre:', anoSemestre)}
+${tableRow('Código/Nome da disciplina:', codNome)}
+${tableRow('CH/Créditos:', chCreditos)}
+${tableRow('Professor Responsável:', profName)}
 </w:tbl>`;
 
   const body = `${identificationTable}
