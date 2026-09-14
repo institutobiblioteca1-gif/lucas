@@ -55,7 +55,6 @@ export function VisualizarPlanoPage({ planId, onBack, onEdit }: { planId: string
   }
 
   function handlePrint() { window.print(); }
-  function handleExportPDF() { window.print(); }
   function handleExportWord() { if (data) downloadDocx(data); }
 
   async function sendForReview() {
@@ -86,9 +85,6 @@ export function VisualizarPlanoPage({ planId, onBack, onEdit }: { planId: string
           )}
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="w-4 h-4" /> Imprimir
-          </Button>
-          <Button variant="outline" onClick={handleExportPDF}>
-            <FileDown className="w-4 h-4" /> PDF
           </Button>
           <Button variant="outline" onClick={handleExportWord}>
             <FileDown className="w-4 h-4" /> Word
