@@ -33,7 +33,7 @@ export function PlanDocument({ plan, discipline, classYear, classEntity, course,
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-base font-bold tracking-tight" style={{ fontSize: '13pt' }}>
-              INSTITUTO ARQUIDIOCESANO DE FILOSOFIA E TEOLOGIA SÃO JOÃO PAULO II
+              INSTITUTO ARQUIDIOCESANO DE TEOLOGIA SÃO JOÃO PAULO II
             </h1>
             <p className="text-sm mt-1" style={{ fontSize: '12pt' }}>Plano de Ensino</p>
             {plan.plan_code && <p className="text-xs text-slate-500 mt-1">{plan.plan_code}</p>}
