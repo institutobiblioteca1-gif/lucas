@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileText, Search, Eye, ChevronDown, Check } from 'lucide-react';
+import { FileText, Search, Eye, ChevronDown, Check, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { PlanStatus } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/helpers';
@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/Layout';
 import { Select } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 
 interface PlanRow {
   id: string;
@@ -28,6 +30,9 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [statusOpen, setStatusOpen] = useState(false);
+  const [statusModalPlan, setStatusModalPlan] = useState<PlanRow | null>(null);
+  const [newStatus, setNewStatus] = useState<PlanStatus | ''>('');
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useEffect(() => { loadPlans(); }, []);
 
@@ -68,6 +73,27 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
     rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     setPlans(rows);
     setLoading(false);
+  }
+
+  function openStatusModal(p: PlanRow) {
+    setStatusModalPlan(p);
+    setNewStatus(p.status);
+  }
+
+  function closeStatusModal() {
+    setStatusModalPlan(null);
+    setNewStatus('');
+  }
+
+  async function saveStatus() {
+    if (!statusModalPlan || !newStatus || newStatus === statusModalPlan.status) return;
+    setSavingStatus(true);
+    await supabase.from('teaching_plans').update({ status: newStatus }).eq('id', statusModalPlan.id);
+    const updatedId = statusModalPlan.id;
+    const updatedStatus = newStatus;
+    setPlans((prev) => prev.map((p) => (p.id === updatedId ? { ...p, status: updatedStatus } : p)));
+    setSavingStatus(false);
+    closeStatusModal();
   }
 
   const filtered = plans.filter((p) => {
@@ -137,7 +163,7 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
                 <th className="px-5 py-3 font-medium">Curso / Turma</th>
                 <th className="px-5 py-3 font-medium">Professor</th>
                 <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium w-20">Ação</th>
+                <th className="px-5 py-3 font-medium w-24">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -161,9 +187,16 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
                   </td>
                   <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
                   <td className="px-5 py-3.5">
-                    <button onClick={() => onReview(p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Revisar plano">
-                      <Eye className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => onReview(p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Revisar plano">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {p.status === 'rascunho' && (
+                        <button onClick={() => openStatusModal(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Alterar status">
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -171,6 +204,41 @@ export function PlanosPage({ onReview }: { onReview: (planId: string) => void })
           </table>
         </div>
       )}
+
+      <Modal open={!!statusModalPlan} onClose={closeStatusModal} title="Alterar Status do Plano" size="sm">
+        {statusModalPlan && (
+          <>
+            <p className="text-sm text-slate-600 mb-4">
+              <span className="font-medium text-slate-900">{statusModalPlan.discipline_name}</span> — {statusModalPlan.class_name} ({statusModalPlan.year}/{statusModalPlan.semester}º). Selecione o novo status para este plano.
+            </p>
+            <div className="space-y-1.5 mb-5">
+              {(Object.keys(STATUS_LABELS) as PlanStatus[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setNewStatus(key)}
+                  className={`w-full flex items-center justify-between rounded-lg border px-3.5 py-2.5 text-left text-sm transition-colors ${
+                    newStatus === key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <StatusBadge status={key} />
+                  {newStatus === key && <Check className="w-4 h-4 text-slate-900" />}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={closeStatusModal}>Cancelar</Button>
+              <Button
+                variant="primary"
+                onClick={saveStatus}
+                disabled={savingStatus || newStatus === statusModalPlan.status}
+              >
+                {savingStatus ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
