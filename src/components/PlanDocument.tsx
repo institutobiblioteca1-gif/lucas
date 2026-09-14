@@ -21,7 +21,7 @@ const SECTIONS = [
 ] as const;
 
 export function PlanDocument({ plan, discipline, classYear, classEntity, course, professor, showStatus, children }: PlanDocumentProps) {
-  const anoSemestre = `${classYear.year}/${classYear.semestre}º`;
+  const anoSemestre = `${classYear.year}/${classYear.semester}º`;
   const chCreditos = `${discipline.workload_hours}h / ${discipline.credits} créditos`;
   const codNome = `${discipline.code} — ${discipline.name}`;
   const profName = professor?.name || '—';
