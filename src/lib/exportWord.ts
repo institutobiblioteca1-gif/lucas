@@ -86,7 +86,7 @@ ${textToParagraphs(plan.bibliografia_aprofundamento, '22')}`;
 
   const headerParagraphs = `<w:p>
 <w:pPr><w:ind w:left="142"/><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:pPr>
-<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>INSTITUTO ARQUIDIOCESANO DE FILOSOFIA E TEOLOGIA SÃO JOÃO PAULO II</w:t></w:r>
+<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>INSTITUTO ARQUIDIOCESANO DE TEOLOGIA SÃO JOÃO PAULO II</w:t></w:r>
 </w:p>
 <w:p>
 <w:pPr><w:ind w:left="142"/><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:pPr>
