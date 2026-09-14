@@ -31,20 +31,12 @@ function sectionHeader(text: string): string {
   return `<w:p><w:pPr><w:spacing w:line="276" w:lineRule="auto"/><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
 }
 
-function tableCell(label: string, value: string, isLabel = true, colSpan = 1): string {
-  const rPr = isLabel
-    ? `<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/>`
-    : `<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/>`;
-  const gridSpan = colSpan > 1 ? `<w:gridSpan w:val="${colSpan}"/>` : '';
-  return `<w:tc><w:tcPr><w:tcW w:w="${isLabel ? '2690' : '2981'}" w:type="dxa"/>${gridSpan}</w:tcPr><w:p><w:pPr><w:jc w:val="both"/><w:rPr>${rPr}</w:rPr></w:pPr><w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escapeXml(label)}${isLabel ? '' : escapeXml(value)}</w:t></w:r></w:p></w:tc>`;
-}
-
 function tableCellWide(label: string, value: string, colSpan: number): string {
   return `<w:tc><w:tcPr><w:tcW w:w="${2690}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="12478" w:type="dxa"/><w:gridSpan w:val="${colSpan}"/></w:tcPr><w:p><w:pPr><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p></w:tc>`;
 }
 
 export function generateDocxXml(data: PlanData): string {
-  const { plan, discipline, classYear, classEntity, course, professor } = data;
+  const { plan, discipline, classYear, course, professor } = data;
   const anoSemestre = `${classYear.year}/${classYear.semester}º`;
   const chCreditos = `${discipline.workload_hours}h / ${discipline.credits} créditos`;
   const codNome = `${discipline.code} — ${discipline.name}`;
@@ -112,6 +104,111 @@ ${body}
 </w:document>`;
 }
 
+const CRC_TABLE: number[] = (() => {
+  const table = new Array<number>(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? (0xedb88320 ^ (c >>> 1)) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xff];
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+interface ZipEntry {
+  nameBytes: Uint8Array;
+  contentBytes: Uint8Array;
+  crc: number;
+  localOffset: number;
+}
+
+/**
+ * Builds a real ZIP archive (uncompressed / STORE method) with no external
+ * dependency, into a single contiguous buffer. A .docx file is just a ZIP
+ * archive of XML parts, so this is enough to produce a genuine, Word-native
+ * document instead of an HTML file disguised as .doc (which Word renders
+ * very inconsistently).
+ */
+function createZipBlob(files: Record<string, string>, mimeType: string): Blob {
+  const encoder = new TextEncoder();
+  const entries: ZipEntry[] = [];
+  let offset = 0;
+
+  for (const [name, content] of Object.entries(files)) {
+    const nameBytes = encoder.encode(name);
+    const contentBytes = encoder.encode(content);
+    entries.push({ nameBytes, contentBytes, crc: crc32(contentBytes), localOffset: offset });
+    offset += 30 + nameBytes.length + contentBytes.length;
+  }
+
+  const centralDirOffset = offset;
+  let centralDirSize = 0;
+  for (const e of entries) centralDirSize += 46 + e.nameBytes.length;
+
+  const out = new Uint8Array(centralDirOffset + centralDirSize + 22);
+  const view = new DataView(out.buffer);
+
+  let pos = 0;
+  for (const e of entries) {
+    view.setUint32(pos, 0x04034b50, true);
+    view.setUint16(pos + 4, 20, true);
+    view.setUint16(pos + 6, 0, true);
+    view.setUint16(pos + 8, 0, true);
+    view.setUint16(pos + 10, 0, true);
+    view.setUint16(pos + 12, 0x21, true);
+    view.setUint32(pos + 14, e.crc, true);
+    view.setUint32(pos + 18, e.contentBytes.length, true);
+    view.setUint32(pos + 22, e.contentBytes.length, true);
+    view.setUint16(pos + 26, e.nameBytes.length, true);
+    view.setUint16(pos + 28, 0, true);
+    out.set(e.nameBytes, pos + 30);
+    out.set(e.contentBytes, pos + 30 + e.nameBytes.length);
+    pos += 30 + e.nameBytes.length + e.contentBytes.length;
+  }
+
+  for (const e of entries) {
+    view.setUint32(pos, 0x02014b50, true);
+    view.setUint16(pos + 4, 20, true);
+    view.setUint16(pos + 6, 20, true);
+    view.setUint16(pos + 8, 0, true);
+    view.setUint16(pos + 10, 0, true);
+    view.setUint16(pos + 12, 0, true);
+    view.setUint16(pos + 14, 0x21, true);
+    view.setUint32(pos + 16, e.crc, true);
+    view.setUint32(pos + 20, e.contentBytes.length, true);
+    view.setUint32(pos + 24, e.contentBytes.length, true);
+    view.setUint16(pos + 28, e.nameBytes.length, true);
+    view.setUint16(pos + 30, 0, true);
+    view.setUint16(pos + 32, 0, true);
+    view.setUint16(pos + 34, 0, true);
+    view.setUint16(pos + 36, 0, true);
+    view.setUint32(pos + 38, 0, true);
+    view.setUint32(pos + 42, e.localOffset, true);
+    out.set(e.nameBytes, pos + 46);
+    pos += 46 + e.nameBytes.length;
+  }
+
+  view.setUint32(pos, 0x06054b50, true);
+  view.setUint16(pos + 4, 0, true);
+  view.setUint16(pos + 6, 0, true);
+  view.setUint16(pos + 8, entries.length, true);
+  view.setUint16(pos + 10, entries.length, true);
+  view.setUint32(pos + 12, centralDirSize, true);
+  view.setUint32(pos + 16, centralDirOffset, true);
+  view.setUint16(pos + 20, 0, true);
+
+  return new Blob([out], { type: mimeType });
+}
+
 export function downloadDocx(data: PlanData) {
   const documentXml = generateDocxXml(data);
 
@@ -131,8 +228,6 @@ export function downloadDocx(data: PlanData) {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>`;
 
-  // Build a minimal docx (zip) using a simple approach with JSZip-like manual assembly
-  // Since we don't have JSZip, we'll use the browser's built-in compression
   const files: Record<string, string> = {
     '[Content_Types].xml': contentTypes,
     '_rels/.rels': rels,
@@ -140,56 +235,11 @@ export function downloadDocx(data: PlanData) {
     'word/_rels/document.xml.rels': docRels,
   };
 
-  // Use a simple approach: create the docx as a .doc (HTML-based) as fallback
-  // Actually, let's build a proper zip using CompressionStream API
-  // For simplicity and reliability, we'll generate an HTML-based .doc file
-  // which Word opens natively
-  const htmlContent = generateHtmlDoc(data);
-  const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+  const blob = createZipBlob(files, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Plano_${data.discipline.code}_${data.classYear.year}.doc`;
+  a.download = `Plano_${data.discipline.code}_${data.classYear.year}.docx`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function generateHtmlDoc(data: PlanData): string {
-  const { plan, discipline, classYear, classEntity, course, professor } = data;
-  const anoSemestre = `${classYear.year}/${classYear.semester}º`;
-  const chCreditos = `${discipline.workload_hours}h / ${discipline.credits} créditos`;
-  const codNome = `${discipline.code} — ${discipline.name}`;
-  const profName = professor?.name || '—';
-
-  const sectionHtml = (label: string, content: string) => `
-    <p style="font-family:Arial; font-size:12pt; font-weight:bold; margin-top:12pt; margin-bottom:4pt;">${label}</p>
-    <div style="font-family:Arial; font-size:11pt; text-align:justify; line-height:1.4; white-space:pre-wrap;">${content || '<span style="color:#999;">Não preenchido</span>'}</div>`;
-
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>Plano de Ensino</title>
-<style>
-@page { size: A4; margin: 2cm; }
-body { font-family: Arial, sans-serif; }
-table { border-collapse: collapse; width: 100%; }
-td { border: 1px solid #000; padding: 4px 6px; font-family: Arial; font-size: 11pt; }
-.label-cell { font-weight: bold; width: 30%; }
-</style></head>
-<body>
-<p style="font-family:Arial; font-size:12pt; font-weight:bold; text-align:justify;">INSTITUTO ARQUIDIOCESANO DE FILOSOFIA E TEOLOGIA SÃO JOÃO PAULO II</p>
-<p style="font-family:Arial; font-size:12pt; text-align:justify;">Plano de Ensino</p>
-<p>&nbsp;</p>
-<table>
-<tr><td class="label-cell">Curso:</td><td colspan="5">${course.name}</td></tr>
-<tr><td class="label-cell">Ano/Semestre:</td><td colspan="5">${anoSemestre}</td></tr>
-<tr><td class="label-cell">Código/Nome da disciplina:</td><td colspan="5">${codNome}</td></tr>
-<tr><td class="label-cell">CH/Créditos:</td><td colspan="5">${chCreditos}</td></tr>
-<tr><td class="label-cell">Professor Responsável:</td><td colspan="5">${profName}</td></tr>
-</table>
-${sectionHtml('Ementa:', plan.ementa)}
-${sectionHtml('COMPETÊNCIAS:', plan.competencias)}
-${sectionHtml('Conteúdo:', plan.conteudo)}
-${sectionHtml('Bibliografia Básica:', plan.bibliografia_basica)}
-${sectionHtml('Bibliografia Complementar:', plan.bibliografia_complementar)}
-${sectionHtml('Bibliografia de Aprofundamento:', plan.bibliografia_aprofundamento)}
-</body></html>`;
 }
